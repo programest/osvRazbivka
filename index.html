@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8"/>
+    <title>ОСВ(Разбивка)</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 6px 8px;
+            text-align: left;
+        }
+
+        thead {
+            background: #97dc56;
+            color: #000000;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        tbody tr:nth-child(even) {
+            background-color: #e6f0fa;
+        }
+
+        th, td {
+            border: 1px solid #6b9c3d;
+        }
+
+
+        #loading {
+            text-align: center;
+            padding: 10px;
+        }
+
+        .toolbar {
+            padding: 10px;
+            background: #f0f0f0;
+            display: grid;
+            grid-template-columns: 1fr 5fr;
+            gap: 10px;
+            align-items: center;
+        }
+        .toolbar > div {
+            padding: 10px;
+            background: #f0f0f0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .toolbar > h3 {
+            text-align: center;
+        }
+
+        select {
+            padding: 5px;
+        }
+
+
+    </style>
+</head>
+<body>
+
+<div class="toolbar">
+    <div>
+        <label for="storage-select">Склад:</label>
+        <select id="storage-select">
+            <option value="a6d18604-ff6d-4527-887d-1ed9493bff1c">Склад MCBOX</option>
+            <option value="6584465f-09ef-4cf2-9c8d-301fb7ae220d">Хоз.склад</option>
+            <option value="bc0114f2-dfc0-41e3-b8bf-cb8fead9bf54">Бар</option>
+            <option value="3e03eb79-de2e-4a44-9053-a68dde1626b0">Кухня</option>
+        </select>
+    </div>
+
+    <h3>Отчёт "Оборотно-сальдовая ведомость" (разбивка)</h3>
+</div>
+
+<div>
+    <table>
+        <thead>
+        <tr>
+            <th rowspan="2">#</th>
+            <th rowspan="2">Код</th>
+            <th rowspan="2">Товар</th>
+            <th rowspan="2">Ед. изм.</th>
+
+            <th colspan="2">Остаток нач.</th>
+            <th colspan="2">Приход</th>
+            <th colspan="2">Продажи</th>
+            <th colspan="2">Вн. перемещение</th>
+            <th colspan="2">Списания</th>
+            <th colspan="2">Излишки</th>
+            <th colspan="2">Недостачи</th>
+            <th colspan="2">Остаток кон.</th>
+        </tr>
+        <tr>
+            <th>Кол-во</th>
+            <th>Сумма</th>
+
+            <th>Кол-во</th>
+            <th>Сумма</th>
+
+            <th>Кол-во</th>
+            <th>Сумма</th>
+
+            <th>Кол-во</th>
+            <th>Сумма</th>
+
+            <th>Кол-во</th>
+            <th>Сумма</th>
+
+            <th>Кол-во</th>
+            <th>Сумма</th>
+
+            <th>Кол-во</th>
+            <th>Сумма</th>
+
+            <th>Кол-во</th>
+            <th>Сумма</th>
+        </tr>
+        </thead>
+
+
+        <tbody id="table-body"></tbody>
+    </table>
+
+    <div id="loading">Загрузка данных...</div>
+</div>
+
+<script>
+    const API_URL = 'https://lk.master-check.kz/api/cus/item'; // или свой локальный
+    const tableBody = document.getElementById('table-body');
+    const loading = document.getElementById('loading');
+    const storageSelect = document.getElementById('storage-select');
+
+    async function fetchData(storageId) {
+        loading.textContent = 'Загрузка...';
+        tableBody.innerHTML = ''; // очищаем таблицу
+
+        try {
+            const myHeaders = new Headers();
+            myHeaders.append("Content-Type", "application/json");
+
+            const raw = JSON.stringify({
+                "action": "testTbsSplit",
+                "data": {
+                    "dateStart": "2000-01-01",
+                    "dateEnd": new Date(new Date().setDate(new Date().getDate() + 1))
+                        .toISOString()
+                        .split('T')[0],
+                    "filters":
+                        {
+                            static: [
+                                {
+                                    attribute: 'position',
+                                    predicate: '>=',
+                                    value: '2000-01-01 00:00:00',
+                                    preoperator: 'AND',
+                                    filteralias: 'position',
+                                    postoperator: '',
+                                    represent: 'test'
+                                },
+                                {
+                                    attribute: 'position',
+                                    predicate:
+                                        '<=',
+                                    value:
+                                        '2029-01-01 00:00:00',
+                                    preoperator:
+                                        'AND',
+                                    filteralias:
+                                        'position',
+                                    postoperator:
+                                        '',
+                                    represent:
+                                        'test'
+                                }
+                            ],
+                            user: [{
+                                attribute: 'storage',
+                                predicate: '=',
+                                value: storageId,
+                                preoperator: 'AND',
+                                filteralias: 'position',
+                                postoperator: '',
+                                represent: 'test'
+                            }]
+                        }
+                }
+            });
+
+            const requestOptions = {
+                method: "POST",
+                headers: myHeaders,
+                body: raw,
+                redirect: "follow"
+            };
+
+            const response = await fetch(API_URL, requestOptions);
+            const result = await response.json();
+
+            const columns = result?.result.report?.list?.columns;
+            const rows = result?.result.report?.list?.rows;
+
+            console.log(columns,
+            rows)
+            if (!Array.isArray(columns) || !Array.isArray(rows)) {
+                loading.textContent = 'Нет данных';
+                return;
+            }
+
+            loading.textContent = '';
+
+// Преобразуем массив массивов в массив объектов
+            const items = rows.map(row =>
+                columns.reduce((acc, colName, index) => {
+                    acc[colName] = row[index];
+                    return acc;
+                }, {})
+            );
+
+            items.forEach((item, index) => {
+                const roww = document.createElement('tr');
+                roww.innerHTML = `
+    <td>${index + 1}</td>
+    <td>${item["nomenclature_code"] || ''}</td>
+    <td>${item["nomenclature"].r || ''}</td>
+    <td style="text-align: center">${item["measure"].r || ''}</td>
+
+    <td style="text-align: right">${item["start_quantity"] ?? 0}</td>
+    <td style="text-align: right">${item["start_sum"] ?? 0}</td>
+
+    <td style="text-align: right">${item["in_quantity"] ?? 0}</td>
+    <td style="text-align: right">${item["in_sum"] ?? 0}</td>
+
+    <td style="text-align: right">${item["out_quantity"] ?? 0}</td>
+    <td style="text-align: right">${item["out_sum"] ?? 0}</td>
+
+    <td style="text-align: right">${item["sale_out_quantity"] ?? 0}</td>
+    <td style="text-align: right">${item["sale_out_sum"] ?? 0}</td>
+
+    <td style="text-align: right">${item["move_quantity"] ?? 0}</td>
+    <td style="text-align: right">${item["move_sum"] ?? 0}</td>
+
+    <td style="text-align: right">${item["surplus_quantity"] ?? 0}</td>
+    <td style="text-align: right">${item["surplus_sum"] ?? 0}</td>
+
+    <td style="text-align: right">${item["shortage_quantity"] ?? 0}</td>
+    <td style="text-align: right">${item["shortage_sum"] ?? 0}</td>
+
+    <td style="text-align: right">${item["final_quantity"] ?? 0}</td>
+    <td style="text-align: right">${item["final_sum"] ?? 0}</td>
+`;
+
+                tableBody.appendChild(roww);
+            });
+
+
+        } catch (error) {
+            console.error(error);
+            loading.textContent = 'Ошибка загрузки';
+        }
+    }
+
+    // Обработка изменения склада
+    storageSelect.addEventListener('change', () => {
+        const selectedStorage = storageSelect.value;
+        fetchData(selectedStorage);
+    });
+
+    // Начальная загрузка
+    fetchData(storageSelect.value);
+</script>
+</body>
+</html>
